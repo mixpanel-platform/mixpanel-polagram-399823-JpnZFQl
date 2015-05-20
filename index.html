@@ -1,50 +1,112 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/css/reset.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
   </head>
   <body class="mixpanel-platform-body">
     <div class="mixpanel-platform-section">
-      <div id="eventSelect" style="float: left;"></div>
-      <div id="by" class="mixpanel-platform-label" style="margin-left: 10px; display: none;">by</div>
+      <div id="intervalSelect" style="float: left;"></div>
+      <div id="interval" class="mixpanel-platform-label" style="margin-left: 10px;">interval</div>
       <div id="propSelect" style="float: left;"></div>
       <div id="dateSelect" style="float: right;"></div>
+      <div style="clear: both;"></div>
+      <div id="unitSelect" style="float: left;"></div>
+      <div id="unit" class="mixpanel-platform-label" style="margin-left: 10px;">unit</div>
       <div style="clear: both;"></div>
       <div id="graph"></div>
     </div>
     <div id="table"></div>
     <script>
-      var eventSelect = $('#eventSelect').MPEventSelect();
-      var propSelect  = $('#propSelect').MPPropertySelect();
-      var dateSelect  = $('#dateSelect').MPDatepicker();
-      var eventGraph  = $('#graph').MPChart({chartType: 'line'});
-      var eventTable  = $('#table').MPTable({
-        showPercentages: true,
-        firstColHeader: 'Event'
-      });
+      MP.api.ready(function() {
+        var dateSelect  = $('#dateSelect').MPDatepicker();
+        var eventGraph  = $('#graph').MPChart({chartType: 'line'});
+        var eventTable  = $('#table').MPTable({
+          showPercentages: true,
+          firstColHeader: 'Property'
+        });
+        
+        var options = {
+          items: [
+            {label: '-- Select interval length in days --', value: 0},
+            {label: '1', value: 1},
+            {label: '5', value: 5},
+            {label: '7', value: 7},
+            {label: '30', value: 30}
+          ]
+        };
+        
+        var intervalPicker = $('#intervalSelect').MPSelect(options);
+        
+         var options2 = {
+          items: [
+            {label: '-- Select interval unit of time --', value: 0},
+            {label: 'Minutes', value: 'minute'},
+            {label: 'Hour', value: 'hour'},
+            {label: 'Day', value: 'day'}
+          ]
+        };
+        
+        var unitPicker = $('#unitSelect').MPSelect(options2);
+        
+        var eventsNum = 2;
+        
+        var params = {
+          from: moment().subtract(1, 'months'),
+          to: moment(),
+          limit: 200,                             // maximum number of results to return
+          length: 1,                             // number of days each user has to complete the funnel
+          length_unit: 'day',
+          on: 'properties[\"campaign_id\"]'
+          //where: 'properties["age"] == 21',       // an expression to filter by.
+          //segment: '$browser'                     // a segmentation expression or event property.
+        };
 
-      var runQuery = function() {
-        var eventName = eventSelect.MPEventSelect('value'),
-            propName  = propSelect.MPPropertySelect('value'),
-            dateRange = dateSelect.MPDatepicker('value');
-
-        if (eventName) {
-          MP.api.segment(eventName, propName, dateRange).done(function(results) {
-            eventGraph.MPChart('setData', results);
-            eventTable.MPTable('setData', results);
-          });
-        }
-      };
-      eventSelect.on('change', function(e, eventName) {
-        propSelect.MPPropertySelect('setEvent', eventName);
-        $("#by").show();
-        runQuery();
+        var runQuery = function() {
+          //var eventName = eventSelect.MPEventSelect('value'),
+          //    propName  = propSelect.MPPropertySelect('value'),
+          var dateRange = dateSelect.MPDatepicker('value'),
+              interval = intervalPicker.MPSelect('value'),
+              unit = unitPicker.MPSelect('value');
+          
+          params['from'] = dateRange.from.toISOString().substring(0, 10);
+          params['to'] = dateRange.to.toISOString().substring(0, 10);
+          params['length'] = interval;
+          params['length_unit'] = unit;
+          
+          if(interval != null && unit != null){
+            MP.api.funnel("$campaign_delivery", "Home", params).done(function(results) {
+              console.log(results);
+              processResults(results);
+            });
+          }
+        };
+        
+        var processResults = function(results) {
+          var newResults = {};
+          var props = Object.keys(results);
+          var finalResults = {};
+          for(i=0; i<props.length; i++){
+            if(props[i] != '$overall'){
+              finalResults[props[i]] = {};
+              var dates = Object.keys(results[props[i]]);
+              for(j=0; j<dates.length; j++) {
+                newResults[dates[j]] = results[props[i]][dates[j]][eventsNum-1]['overall_conv_ratio'] * 100;
+              }
+              finalResults[props[i]] = newResults;
+              newResults = {};
+            }
+          }
+          console.log(finalResults);
+          eventGraph.MPChart('setData', finalResults);
+          eventTable.MPTable('setData', finalResults);
+        };
+        
+        intervalPicker.on('change', runQuery);
+        unitPicker.on('change', runQuery);
+        dateSelect.on('change', runQuery);
       });
-      propSelect.on('change', runQuery);
-      dateSelect.on('change', runQuery);
     </script>
   </body>
 </html>
