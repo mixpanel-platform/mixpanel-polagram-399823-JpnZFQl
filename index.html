@@ -15,6 +15,9 @@
       <div id="unitSelect" style="float: left;"></div>
       <div id="unit" class="mixpanel-platform-label" style="margin-left: 10px;">unit</div>
       <div style="clear: both;"></div>
+      <div id="eventSelect" style="float: left;"></div>
+      <div id="event" class="mixpanel-platform-label" style="margin-left: 10px;">end event</div>
+      <div style="clear: both;"></div>
       <div id="graph"></div>
     </div>
     <div id="table"></div>
@@ -50,6 +53,16 @@
         
         var unitPicker = $('#unitSelect').MPSelect(options2);
         
+        var options3 = {
+          items: [
+            {label: '-- Select event --', value: 0},
+            {label: 'Home', value: 'Home'},
+            {label: 'Recipients', value: 'Recipients'}
+          ]
+        };
+        
+        var eventPicker = $('#eventSelect').MPSelect(options3);
+        
         var eventsNum = 2;
         
         var params = {
@@ -58,7 +71,7 @@
           limit: 200,                             // maximum number of results to return
           length: 1,                             // number of days each user has to complete the funnel
           length_unit: 'day',
-          on: 'properties[\"campaign_id\"]'
+          on: 'properties["campaign_id"]'
           //where: 'properties["age"] == 21',       // an expression to filter by.
           //segment: '$browser'                     // a segmentation expression or event property.
         };
@@ -68,15 +81,16 @@
           //    propName  = propSelect.MPPropertySelect('value'),
           var dateRange = dateSelect.MPDatepicker('value'),
               interval = intervalPicker.MPSelect('value'),
-              unit = unitPicker.MPSelect('value');
+              unit = unitPicker.MPSelect('value'),
+              eventName = eventPicker.MPSelect('value');
           
           params['from'] = dateRange.from.toISOString().substring(0, 10);
           params['to'] = dateRange.to.toISOString().substring(0, 10);
           params['length'] = interval;
           params['length_unit'] = unit;
           
-          if(interval != null && unit != null){
-            MP.api.funnel("$campaign_delivery", "Home", params).done(function(results) {
+          if(interval != null && unit != null && eventName != null){
+            MP.api.funnel("$campaign_delivery", eventName, params).done(function(results) {
               console.log(results);
               processResults(results);
             });
